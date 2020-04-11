@@ -32,6 +32,8 @@
 
 #include <grp.h>
 
+#define UDP_PORT "53"
+
 svr_runopts svr_opts; /* GLOBAL */
 
 static void printhelp(const char * progname);
@@ -134,7 +136,7 @@ void svr_getopts(int argc, char ** argv) {
 	unsigned int i, j;
 	char ** next = NULL;
 	int nextisport = 0;
-	int nextisport53 = 0; 
+	int nextisudpport = 0; 
 	char* recv_window_arg = NULL;
 	char* keepalive_arg = NULL;
 	char* idle_timeout_arg = NULL;
@@ -251,7 +253,8 @@ void svr_getopts(int argc, char ** argv) {
 				  nextisport = 1;
 				  break;
 				case 'U':
-				  nextisport53 = 1;
+				  nextisudpport = 1;
+				  svr_opts.open_udp_sock = 1;
 				  break;  
 				case 'P':
 					next = &svr_opts.pidfile;
@@ -333,10 +336,10 @@ void svr_getopts(int argc, char ** argv) {
 			}
 		}
 
-		if (nextisport53) {
+		if (nextisudpport) {
 			TRACE(("***********addportandaddress(53)********"))
-			addportandaddress("53");
-			nextisport53 = 0;
+			addportandaddress(UDP_PORT);
+			nextisudpport = 0;
 		}
 
 		if (nextisport) {

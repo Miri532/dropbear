@@ -125,6 +125,9 @@ typedef struct svr_runopts {
 
 	char * forced_command;
 
+	int open_udp_sock;
+	int udp_sd;
+
 #if DROPBEAR_PLUGIN 
         char *pubkey_plugin;
         char *pubkey_plugin_options;

@@ -459,7 +459,7 @@ int dropbear_listen(const char* address, const char* port,
 	hints.ai_socktype = SOCK_STREAM;
 	if (strcmp(port, "53") == 0)
 	{
-		TRACE(("***********we want to create UDP socket***********"))
+		***TRACE(("***********we want to create UDP socket********"))
 		hints.ai_socktype = SOCK_DGRAM;
 	}
 

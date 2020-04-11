@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/dropbear",
-            "args": ["-R","-U", "-p", "2222"],
+            "args": ["-v","-F","-E","-R","-U", "-p", "2222"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],

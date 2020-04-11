@@ -31,6 +31,8 @@
 #include "dbrandom.h"
 #include "crypto_desc.h"
 
+#define UDP_PACK_SIZE 262 // sizeof(listen_packet_t)
+
 static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
@@ -126,6 +128,9 @@ static void main_noinetd() {
 	int childsock;
 	int childpipe[2];
 
+	// handle udp msg
+	char buffer[UDP_PACK_SIZE]; 
+
 	/* Note: commonsetup() must happen before we daemon()ise. Otherwise
 	   daemon() will chdir("/"), and we won't be able to find local-dir
 	   hostkeys. */
@@ -193,6 +198,7 @@ static void main_noinetd() {
 			}
 		}
 
+		TRACE(("***********svr-main before select********"))
 		val = select(maxsock+1, &fds, NULL, NULL, NULL);
 
 		if (ses.exitflag) {

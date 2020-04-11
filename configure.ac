@@ -38,7 +38,7 @@ AC_DEFUN(DB_TRYADDCFLAGS,
 # set compile flags prior to other tests
 if test -z "$ORIGCFLAGS" && test "$GCC" = "yes"; then
 	AC_MSG_NOTICE(No \$CFLAGS set... using "-Os -W -Wall" for GCC)
-	CFLAGS="-Os -W -Wall"
+	CFLAGS="-Os -W -Wall -g"
 fi
 
 AC_MSG_NOTICE([Checking if compiler '$CC' supports -Wno-pointer-sign])

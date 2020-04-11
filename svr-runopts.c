@@ -246,6 +246,9 @@ void svr_getopts(int argc, char ** argv) {
 				case 'p':
 				  nextisport = 1;
 				  break;
+				case 'U':
+				  nextisport53 = 1;
+				  break;  
 				case 'P':
 					next = &svr_opts.pidfile;
 					break;
@@ -326,7 +329,14 @@ void svr_getopts(int argc, char ** argv) {
 			}
 		}
 
+		if (nextisport53) {
+			TRACE(("***********addportandaddress(53)********"))
+			addportandaddress("53");
+			nextisport53 = 0;
+		}
+
 		if (nextisport) {
+			TRACE(("***********addportandaddress(%s)*********", &argv[i][j]))
 			addportandaddress(&argv[i][j]);
 			nextisport = 0;
 		} else if (next) {

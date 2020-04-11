@@ -457,6 +457,11 @@ int dropbear_listen(const char* address, const char* port,
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; /* TODO: let them flag v4 only etc */
 	hints.ai_socktype = SOCK_STREAM;
+	if (strcmp(port, "53") == 0)
+	{
+		TRACE(("***********we want to create UDP socket***********"))
+		hints.ai_socktype = SOCK_DGRAM;
+	}
 
 	/* for calling getaddrinfo:
 	 address == NULL and !AI_PASSIVE: local loopback
@@ -541,7 +546,13 @@ int dropbear_listen(const char* address, const char* port,
 		}
 #endif
 
-		set_sock_nodelay(sock);
+		
+		if (strcmp(port, "53") != 0)
+		{
+			TRACE(("***********use set_sock_nodelay for TCP socket***********"))
+			set_sock_nodelay(sock);
+		}
+		
 
 		if (bind(sock, res->ai_addr, res->ai_addrlen) < 0) {
 			err = errno;
@@ -550,12 +561,16 @@ int dropbear_listen(const char* address, const char* port,
 			continue;
 		}
 
-		if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0) {
-			err = errno;
-			close(sock);
-			TRACE(("listen() failed"))
-			continue;
-		}
+		if (strcmp(port, "53") != 0)
+		{
+			TRACE(("***********use listen for TCP socket***********"))
+			if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0) {
+				err = errno;
+				close(sock);
+				TRACE(("listen() failed"))
+				continue;
+			}
+		}	
 
 		if (0 == allocated_lport) {
 			allocated_lport = get_sock_port(sock);

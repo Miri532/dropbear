@@ -134,6 +134,7 @@ void svr_getopts(int argc, char ** argv) {
 	unsigned int i, j;
 	char ** next = NULL;
 	int nextisport = 0;
+	int nextisport53 = 0; 
 	char* recv_window_arg = NULL;
 	char* keepalive_arg = NULL;
 	char* idle_timeout_arg = NULL;

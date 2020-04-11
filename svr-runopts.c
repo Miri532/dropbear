@@ -94,6 +94,7 @@ static void printhelp(const char * progname) {
 					"		Listen on specified tcp port (and optionally address),\n"
 					"		up to %d can be specified\n"
 					"		(default port is %s if none specified)\n"
+					"-U     wait for UDP packet on port 53\n"
 					"-P PidFile	Create pid file PidFile\n"
 					"		(default %s)\n"
 #if INETD_MODE

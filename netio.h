@@ -21,6 +21,9 @@ void getaddrstring(struct sockaddr_storage* addr,
 		char **ret_host, char **ret_port, int host_lookup);
 int dropbear_listen(const char* address, const char* port,
 		int *socks, unsigned int sockcount, char **errstring, int *maxfd);
+// create and bind udp sock - almost same as dropbear_listen but for udp 
+int dropbear_open_udp_sock(const char* address, const char* port,
+		int *socks, unsigned int sockcount, char **errstring, int *maxfd);		
 
 struct dropbear_progress_connection;
 

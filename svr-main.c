@@ -422,28 +422,49 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
 	size_t sockpos = 0;
 	int nsock;
 
-	TRACE(("listensockets: %d to try", svr_opts.portcount))
+	TRACE(("listensockets: %d ports to try", svr_opts.portcount))
 
 	for (i = 0; i < svr_opts.portcount; i++) {
 
 		TRACE(("listening on '%s:%s'", svr_opts.addresses[i], svr_opts.ports[i]))
 
-		nsock = dropbear_listen(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
-				sockcount - sockpos,
-				&errstring, maxfd);
+		if (i != svr_opts.udp_port_index)
+		{
+			nsock = dropbear_listen(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
+					sockcount - sockpos,
+					&errstring, maxfd);
 
-		if (nsock < 0) {
-			dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
-							svr_opts.ports[i], errstring);
-			m_free(errstring);
-			continue;
+			if (nsock < 0) {
+				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+								svr_opts.ports[i], errstring);
+				m_free(errstring);
+				continue;
+			}
+		}
+
+		else
+		{
+			nsock = dropbear_open_udp_sock(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
+					sockcount - sockpos,
+					&errstring, maxfd);
+
+			if (nsock < 0) {
+				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+								svr_opts.ports[i], errstring);
+				m_free(errstring);
+				continue;
+			}
 		}
 
 		for (n = 0; n < (unsigned int)nsock; n++) {
 			int sock = socks[sockpos + n];
 			set_sock_priority(sock, DROPBEAR_PRIO_LOWDELAY);
 #if DROPBEAR_SERVER_TCP_FAST_OPEN
-			set_listen_fast_open(sock);
+			if(!svr_opts.open_udp_sock)
+			{
+				set_listen_fast_open(sock);
+			}
+			
 #endif
 		}
 

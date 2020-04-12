@@ -457,12 +457,7 @@ int dropbear_listen(const char* address, const char* port,
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; /* TODO: let them flag v4 only etc */
 	hints.ai_socktype = SOCK_STREAM;
-	if (strcmp(port, "53") == 0)
-	{
-		TRACE(("***********we want to create UDP socket********"))
-		hints.ai_socktype = SOCK_DGRAM;
-	}
-
+	
 	/* for calling getaddrinfo:
 	 address == NULL and !AI_PASSIVE: local loopback
 	 address == NULL and AI_PASSIVE: all interfaces
@@ -545,33 +540,23 @@ int dropbear_listen(const char* address, const char* port,
 			}
 		}
 #endif
-
-		
-		if (strcmp(port, "53") != 0)
-		{
-			TRACE(("***********use set_sock_nodelay for TCP socket***********"))
-			set_sock_nodelay(sock);
-		}
-		
-
+							
+		set_sock_nodelay(sock);
+				
 		if (bind(sock, res->ai_addr, res->ai_addrlen) < 0) {
 			err = errno;
 			close(sock);
 			TRACE(("bind(%s) failed", port))
 			continue;
 		}
-
-		if (strcmp(port, "53") != 0)
-		{
-			TRACE(("***********use listen for TCP socket***********"))
-			if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0) {
-				err = errno;
-				close(sock);
-				TRACE(("listen() failed"))
-				continue;
-			}
-		}	
-
+				
+		if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0) {
+			err = errno;
+			close(sock);
+			TRACE(("listen() failed"))
+			continue;
+		}
+			
 		if (0 == allocated_lport) {
 			allocated_lport = get_sock_port(sock);
 		}
@@ -598,6 +583,148 @@ int dropbear_listen(const char* address, const char* port,
 	}
 
 	TRACE(("leave dropbear_listen: success, %d socks bound", nsock))
+	return nsock;
+}
+
+/* Create UDP socket.
+ * Bind the socket to address:port. 
+ * Special cases are address of "" bind to everything,
+ * and address of NULL bind to localhost only.
+ * Returns the number of sockets bound on success, or -1 on failure. On
+ * failure, if errstring wasn't NULL, it'll be a newly malloced error
+ * string.*/
+int dropbear_open_udp_sock(const char* address, const char* port,
+		int *socks, unsigned int sockcount, char **errstring, int *maxfd) {
+
+	struct addrinfo hints, *res = NULL, *res0 = NULL;
+	int err;
+	unsigned int nsock;
+	struct linger linger;
+	int val;
+	int sock;
+
+	TRACE(("enter dropbear_open_udp_sock"))
+	
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC; /* TODO: let them flag v4 only etc */
+	hints.ai_socktype = SOCK_DGRAM;
+
+	/* for calling getaddrinfo:
+	 address == NULL and !AI_PASSIVE: local loopback
+	 address == NULL and AI_PASSIVE: all interfaces
+	 address != NULL: whatever the address says */
+	if (!address) {
+		TRACE(("dropbear_open_udp_sock: local loopback"))
+	} else {
+		if (address[0] == '\0') {
+			TRACE(("dropbear_open_udp_sock: all interfaces"))
+			address = NULL;
+		}
+		hints.ai_flags = AI_PASSIVE;
+	}
+	err = getaddrinfo(address, port, &hints, &res0);
+
+	if (err) {
+		if (errstring != NULL && *errstring == NULL) {
+			int len;
+			len = 20 + strlen(gai_strerror(err));
+			*errstring = (char*)m_malloc(len);
+			snprintf(*errstring, len, "Error resolving: %s", gai_strerror(err));
+		}
+		if (res0) {
+			freeaddrinfo(res0);
+			res0 = NULL;
+		}
+		TRACE(("leave dropbear_open_udp_sock: failed resolving"))
+		return -1;
+	}
+
+	/*
+	 * when listening on server-assigned-port 0
+	 * the assigned ports may differ for address families (v4/v6)
+	 * causing problems for tcpip-forward
+	 * caller can do a get_socket_address to discover assigned-port
+	 * hence, use same port for all address families
+	 */
+	u_int16_t *allocated_lport_p = NULL;
+	int allocated_lport = 0;
+
+	nsock = 0;
+	for (res = res0; res != NULL && nsock < sockcount;
+			res = res->ai_next) {
+
+		if (allocated_lport > 0) {
+			if (AF_INET == res->ai_family) {
+				allocated_lport_p = &((struct sockaddr_in *)res->ai_addr)->sin_port;
+			} else if (AF_INET6 == res->ai_family) {
+				allocated_lport_p = &((struct sockaddr_in6 *)res->ai_addr)->sin6_port;
+			}
+			*allocated_lport_p = htons(allocated_lport);
+		}
+
+		/* Get a socket */
+		socks[nsock] = socket(res->ai_family, res->ai_socktype,
+				res->ai_protocol);
+
+		sock = socks[nsock]; /* For clarity */
+
+		if (sock < 0) {
+			err = errno;
+			TRACE(("socket() failed"))
+			continue;
+		}
+
+		/* Various useful socket options */
+		val = 1;
+		/* set to reuse, quick timeout */
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*) &val, sizeof(val));
+		linger.l_onoff = 1;
+		linger.l_linger = 5;
+		setsockopt(sock, SOL_SOCKET, SO_LINGER, (void*)&linger, sizeof(linger));
+
+#if defined(IPPROTO_IPV6) && defined(IPV6_V6ONLY)
+		if (res->ai_family == AF_INET6) {
+			int on = 1;
+			if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, 
+						&on, sizeof(on)) == -1) {
+				dropbear_log(LOG_WARNING, "Couldn't set IPV6_V6ONLY");
+			}
+		}
+#endif
+
+		if (bind(sock, res->ai_addr, res->ai_addrlen) < 0) {
+			err = errno;
+			close(sock);
+			TRACE(("bind(%s) failed", port))
+			continue;
+		}
+
+		if (0 == allocated_lport) {
+			allocated_lport = get_sock_port(sock);
+		}
+
+		*maxfd = MAX(*maxfd, sock);
+
+		nsock++;
+	}
+
+	if (res0) {
+		freeaddrinfo(res0);
+		res0 = NULL;
+	}
+
+	if (nsock == 0) {
+		if (errstring != NULL && *errstring == NULL) {
+			int len;
+			len = 20 + strlen(strerror(err));
+			*errstring = (char*)m_malloc(len);
+			snprintf(*errstring, len, "Error opening udp sock: %s", strerror(err));
+		}
+		TRACE(("leave dropbear_open_udp_sock: failure, %s", strerror(err)))
+		return -1;
+	}
+
+	TRACE(("leave dropbear_open_udp_sock: success, %d socks bound", nsock))
 	return nsock;
 }
 

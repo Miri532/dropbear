@@ -125,8 +125,9 @@ typedef struct svr_runopts {
 
 	char * forced_command;
 
-	int open_udp_sock;
+	int open_udp_sock; // bool
 	int udp_sd;
+	int udp_port_index; // save index of udp port in the ports array
 
 #if DROPBEAR_PLUGIN 
         char *pubkey_plugin;

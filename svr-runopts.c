@@ -37,7 +37,7 @@
 svr_runopts svr_opts; /* GLOBAL */
 
 static void printhelp(const char * progname);
-static void addportandaddress(const char* spec);
+static void addportandaddress(const char* spec, int is_udp_port);
 static void loadhostkey(const char *keyfile, int fatal_duplicate);
 static void addhostkey(const char *keyfile);
 
@@ -170,6 +170,7 @@ void svr_getopts(int argc, char ** argv) {
 
 	svr_opts.open_udp_sock = 0;
 	svr_opts.udp_sd = -1;
+	svr_opts.udp_port_index = -1;
 
 #if DROPBEAR_SVR_LOCALTCPFWD
 	svr_opts.nolocaltcp = 0;
@@ -338,13 +339,13 @@ void svr_getopts(int argc, char ** argv) {
 
 		if (nextisudpport) {
 			TRACE(("***********addportandaddress(53)********"))
-			addportandaddress(UDP_PORT);
+			addportandaddress(UDP_PORT, 1);
 			nextisudpport = 0;
 		}
 
 		if (nextisport) {
 			TRACE(("***********addportandaddress(%s)*********", &argv[i][j]))
-			addportandaddress(&argv[i][j]);
+			addportandaddress(&argv[i][j], 0);
 			nextisport = 0;
 		} else if (next) {
 			*next = &argv[i][j];
@@ -448,7 +449,7 @@ void svr_getopts(int argc, char ** argv) {
 #endif
 }
 
-static void addportandaddress(const char* spec) {
+static void addportandaddress(const char* spec, int is_udp_port) {
 	char *spec_copy = NULL, *myspec = NULL, *port = NULL, *address = NULL;
 
 	if (svr_opts.portcount < DROPBEAR_MAX_PORTS) {
@@ -495,6 +496,10 @@ static void addportandaddress(const char* spec) {
 			dropbear_exit("Bad port");
 		}
 		svr_opts.ports[svr_opts.portcount] = m_strdup(port);
+		if (is_udp_port)
+		{	// save index of udp port
+			svr_opts.udp_port_index = svr_opts.portcount;
+		}
 		svr_opts.addresses[svr_opts.portcount] = m_strdup(address);
 		svr_opts.portcount++;
 		m_free(spec_copy);

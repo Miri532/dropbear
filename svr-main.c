@@ -33,7 +33,7 @@
 
 #define UDP_PACK_SIZE 262 // sizeof(listen_packet_t)
 
-static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
+static size_t listensockets(int *sock, int *udp_socks, size_t *udp_count, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
 static void sigintterm_handler(int fish);
@@ -119,7 +119,9 @@ static void main_noinetd() {
 	int val;
 	int maxsock = -1;
 	int listensocks[MAX_LISTEN_ADDR];
+	int udpsocks[MAX_LISTEN_ADDR];
 	size_t listensockcount = 0;
+	size_t udpsockcount = 0;
 	FILE *pidfile = NULL;
 
 	int childpipes[MAX_UNAUTH_CLIENTS];
@@ -144,7 +146,10 @@ static void main_noinetd() {
 	
 	/* Set up the listening sockets */
 	// listensockcount =  4 2 for each port max sok = max sd
-	listensockcount = listensockets(listensocks, MAX_LISTEN_ADDR, &maxsock);
+	// maxsock = max fd
+	// MAX_LISTEN_ADDR = sockcount = max amount of socks we have room to create
+	// listensocks - array to store the open socks
+	listensockcount = listensockets(listensocks, udpsocks, &udpsockcount, MAX_LISTEN_ADDR, &maxsock);
 	if (listensockcount == 0)
 	{
 		dropbear_exit("No listening ports available.");
@@ -152,6 +157,10 @@ static void main_noinetd() {
 
 	for (i = 0; i < listensockcount; i++) {
 		FD_SET(listensocks[i], &fds);
+	}
+
+	for (i = 0; i < udpsockcount; i++) {
+		FD_SET(udpsocks[i], &fds);
 	}
 
 	/* fork */
@@ -189,6 +198,10 @@ static void main_noinetd() {
 		/* listening sockets */
 		for (i = 0; i < listensockcount; i++) {
 			FD_SET(listensocks[i], &fds);
+		}
+		// udp sockets
+		for (i = 0; i < udpsockcount; i++) {
+			FD_SET(udpsocks[i], &fds);
 		}
 
 		/* pre-authentication clients */
@@ -229,7 +242,12 @@ static void main_noinetd() {
 			}
 		}
 
-		/* handle each socket which has something to say */
+		/* handle each udp socket which has something to say */
+		for (i = 0; i < udpsockcount; i++)
+		{
+			
+		}
+		/* handle each tcp socket which has something to say */
 		for (i = 0; i < listensockcount; i++) {
 			size_t num_unauthed_for_addr = 0;
 			size_t num_unauthed_total = 0;
@@ -416,12 +434,17 @@ static void commonsetup() {
 }
 
 /* Set up listening sockets for all the requested ports */
-static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
+// udp_socks - arraty to store udp socks
+// udp_count - number of udp socks created
+// the return value will only count num of tcp socks
+static size_t listensockets(int *socks, int *udp_socks, size_t *udp_count, size_t sockcount, int *maxfd) {
 
 	unsigned int i, n;
 	char* errstring = NULL;
 	size_t sockpos = 0;
+	size_t udpsockpos = 0;
 	int nsock;
+	int udpnsock;
 
 	TRACE(("listensockets: %d ports to try", svr_opts.portcount))
 
@@ -449,16 +472,12 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
 		{
 			// int dropbear_open_udp_sock(const char* address, const char* port,
 			// int *socks, unsigned int sockcount, char **errstring, int *maxfd)
-			// sockcount = max ammount of socks we have room to create 
-			TRACE(("******before udp sockcount: %d sockpos: %d", sockcount, sockpos))
-			nsock = dropbear_open_udp_sock(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
-					sockcount - sockpos,
-					&errstring, maxfd);	
+			// sockcount = max amount of socks we have room to create 
+			udpnsock = dropbear_open_udp_sock(svr_opts.addresses[i], svr_opts.ports[i], &udp_socks[udpsockpos], 
+					sockcount - udpsockpos,
+					&errstring, maxfd);			
 
-			TRACE(("******after udp sockcount: %d sockpos: %d", sockcount, sockpos))
-			TRACE(("******socks[0] = %d socks[1] = %d", socks[0], socks[1]))
-
-			if (nsock < 0) {
+			if (udpnsock < 0) {
 				dropbear_log(LOG_WARNING, "Failed opening '%s': %s", 
 								svr_opts.ports[i], errstring);
 				m_free(errstring);
@@ -470,16 +489,19 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
 			int sock = socks[sockpos + n];
 			set_sock_priority(sock, DROPBEAR_PRIO_LOWDELAY);
 #if DROPBEAR_SERVER_TCP_FAST_OPEN
-			if(!svr_opts.open_udp_sock)
-			{
-				set_listen_fast_open(sock);
-			}
-			
+			set_listen_fast_open(sock);			
 #endif
 		}
 
+		for (n = 0; n < (unsigned int)udpnsock; n++) {
+			int sock = udp_socks[udpsockpos + n];
+			set_sock_priority(sock, DROPBEAR_PRIO_LOWDELAY);
+		}
+		udpsockpos += udpnsock;
 		sockpos += nsock;
-
 	}
+
+	*udp_count = udpsockpos;
+	// return num of tcp socks opened
 	return sockpos;
 }

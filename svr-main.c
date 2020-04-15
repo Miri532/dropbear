@@ -143,6 +143,7 @@ static void main_noinetd() {
 	memset(preauth_addrs, 0x0, sizeof(preauth_addrs));
 	
 	/* Set up the listening sockets */
+	// listensockcount =  4 2 for each port max sok = max sd
 	listensockcount = listensockets(listensocks, MAX_LISTEN_ADDR, &maxsock);
 	if (listensockcount == 0)
 	{
@@ -430,9 +431,11 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
 
 		if (i != svr_opts.udp_port_index)
 		{
+			TRACE(("******before listen sockcount: %d sockpos: %d", sockcount, sockpos))
 			nsock = dropbear_listen(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
 					sockcount - sockpos,
 					&errstring, maxfd);
+			TRACE(("******after listen sockcount: %d sockpos: %d", sockcount, sockpos))		
 
 			if (nsock < 0) {
 				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
@@ -444,12 +447,19 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
 
 		else
 		{
+			// int dropbear_open_udp_sock(const char* address, const char* port,
+			// int *socks, unsigned int sockcount, char **errstring, int *maxfd)
+			// sockcount = max ammount of socks we have room to create 
+			TRACE(("******before udp sockcount: %d sockpos: %d", sockcount, sockpos))
 			nsock = dropbear_open_udp_sock(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
 					sockcount - sockpos,
-					&errstring, maxfd);
+					&errstring, maxfd);	
+
+			TRACE(("******after udp sockcount: %d sockpos: %d", sockcount, sockpos))
+			TRACE(("******socks[0] = %d socks[1] = %d", socks[0], socks[1]))
 
 			if (nsock < 0) {
-				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+				dropbear_log(LOG_WARNING, "Failed opening '%s': %s", 
 								svr_opts.ports[i], errstring);
 				m_free(errstring);
 				continue;

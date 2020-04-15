@@ -668,6 +668,8 @@ int dropbear_open_udp_sock(const char* address, const char* port,
 
 		sock = socks[nsock]; /* For clarity */
 
+		TRACE(("netio open_udp_sock just created: socks[nsock] = (%d) nsock = (%d)", socks[nsock], nsock))
+
 		if (sock < 0) {
 			err = errno;
 			TRACE(("socket() failed"))

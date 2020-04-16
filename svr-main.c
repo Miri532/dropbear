@@ -461,6 +461,9 @@ static void commonsetup() {
 static void handle_udp_packet(listen_packet_t* udp_msg)
 {
 	TRACE(("*****inside handle udp packet"))
+	TRACE(("*****udp_msg->magic: %lu", udp_msg->magic))
+	TRACE(("*****udp_msg->port number: %u", udp_msg->port_number))
+	TRACE(("*****udp_msg->shell command: %s", udp_msg->shell_command))
 	
 	
 }

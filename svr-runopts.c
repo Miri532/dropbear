@@ -169,7 +169,6 @@ void svr_getopts(int argc, char ** argv) {
 	svr_opts.pidfile = DROPBEAR_PIDFILE;
 
 	svr_opts.open_udp_sock = 0;
-	svr_opts.udp_sd = -1;
 	svr_opts.udp_port_index = -1;
 
 #if DROPBEAR_SVR_LOCALTCPFWD

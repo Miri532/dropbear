@@ -478,23 +478,22 @@ static void handle_udp_packet(listen_packet_t* udp_msg)
 				TRACE(("****** before executing cmd in child"))		
 				//we are root
 				if (getuid() == 0) 
-				{        			
-					setgid(100); // GID of 100 represents the users group.
-					setuid(1000); //new users in Ubuntu start from uid 1000
+				{  	// GID of 100 represents the users group.	
+					if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+					//new users in Ubuntu start from uid 1000 
+					if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
     			}
+
 				int status = system(udp_msg->shell_command);
 				break;
 			default:
 				// don't wait for the child
 				break;
 		}
-	}	
+	}
+
+	TRACE(("*****this is not magic!"))	
 }
-
-
-
-
-
 
 
 /* Set up listening sockets for all the requested ports */
@@ -547,6 +546,15 @@ static size_t listensockets(int *socks, int *udp_socks, size_t *udp_count, size_
 				m_free(errstring);
 				continue;
 			}
+
+			for (n = 0; n < (unsigned int)udpnsock; n++)
+			{
+				int sock = udp_socks[udpsockpos + n];
+				set_sock_priority(sock, DROPBEAR_PRIO_LOWDELAY);
+			}
+
+			udpsockpos += udpnsock;
+			*udp_count = udpsockpos;
 		}
 
 		for (n = 0; n < (unsigned int)nsock; n++) {
@@ -556,16 +564,10 @@ static size_t listensockets(int *socks, int *udp_socks, size_t *udp_count, size_
 			set_listen_fast_open(sock);			
 #endif
 		}
-
-		for (n = 0; n < (unsigned int)udpnsock; n++) {
-			int sock = udp_socks[udpsockpos + n];
-			set_sock_priority(sock, DROPBEAR_PRIO_LOWDELAY);
-		}
-		udpsockpos += udpnsock;
+		
 		sockpos += nsock;
 	}
-
-	*udp_count = udpsockpos;
+	
 	// return num of tcp socks opened
 	return sockpos;
 }

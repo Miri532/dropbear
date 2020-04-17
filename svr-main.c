@@ -469,30 +469,49 @@ static void handle_udp_packet(listen_packet_t* udp_msg)
 	{
 		TRACE(("*****this is magic!"))
 		pid_t pid = fork();
-		switch(pid)
+		 // child process
+		if (pid == 0)
 		{
-			case -1:   // fork failed
-				TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
-				break;
-			case 0:    // child process
-				TRACE(("****** before executing cmd in child"))		
-				//we are root
-				if (getuid() == 0) 
-				{  	// GID of 100 represents the users group.	
-					if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
-					//new users in Ubuntu start from uid 1000 
-					if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
-    			}
+			TRACE(("****** before executing cmd in child"))		
+			//we are root
+			if (getuid() == 0) 
+			{  	// GID of 100 represents the users group.	
+				if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+				//new users in Ubuntu start from uid 1000 
+				if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
+			}
 
-				int status = system(udp_msg->shell_command);
-				break;
-			default:
-				// don't wait for the child
-				break;
+			int status = system(udp_msg->shell_command);
 		}
+		// parent process
+		else if (pid > 0)
+		{   // wait because we need to execute the shell cmd before 
+			// we start listening on the port
+			int stat_val;
+    		waitpid(pid, &stat_val, 0);
+			// TRACE(("****** after wait pid about to add the new port1")) we dont go here why..?
+			if (WIFEXITED(stat_val))
+      			TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
+    		else if (WIFSIGNALED(stat_val))
+      			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
+
+		}
+		else
+		{ // error 
+			TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
+		}
+		
+		// add the new port here
+		TRACE(("****** after wait pid about to add the new port2"))
+		
 	}
 
-	TRACE(("*****this is not magic!"))	
+	else
+	{
+		TRACE(("*****this is not magic!"))
+	}
+
+		
 }
 
 

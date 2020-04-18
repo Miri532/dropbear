@@ -39,7 +39,7 @@ IMPORTANT: Some options will require "make clean" after changes */
 
 /* Include verbose debug output, enabled with -v at runtime. 
  * This will add a reasonable amount to your executable size. */
-#define DEBUG_TRACE 1
+#define DEBUG_TRACE 0
 
 /* Set this if you want to use the DROPBEAR_SMALL_CODE option. This can save
  * several kB in binary size however will make the symmetrical ciphers and hashes
